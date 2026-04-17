@@ -1,14 +1,31 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import requests
 from moviepy.editor import VideoClip, AudioFileClip, ImageClip, CompositeVideoClip
 
+# -------------------------
+# FORCE OUTPUT FOLDER
+# -------------------------
+BASE_DIR = "powerpoint"
+os.makedirs(BASE_DIR, exist_ok=True)
+
+def path(file):
+    return os.path.join(BASE_DIR, file)
+
+# -------------------------
+# SAFE DOWNLOAD FUNCTION
+# -------------------------
 def download(url, filename):
+    filepath = path(filename)
     r = requests.get(url)
-    with open(filename, "wb") as f:
+    r.raise_for_status()
+    with open(filepath, "wb") as f:
         f.write(r.content)
 
-# Assets
+# -------------------------
+# DOWNLOAD ASSETS INTO /powerpoint
+# -------------------------
 download("https://www.kindpng.com/picc/m/83-832850_american-ninja-warrior-logo-png-american-ninja-warrior.png", "ninja.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Bowling_pins_icon.svg/512px-Bowling_pins_icon.svg.png", "tenpin.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Bank_of_England_%C2%A35_note.jpg/512px-Bank_of_England_%C2%A35_note.jpg", "five.png")
@@ -16,13 +33,15 @@ download("https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Bank_of_Engl
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Bank_of_England_%C2%A320_note.jpg/512px-Bank_of_England_%C2%A320_note.jpg", "twenty.png")
 download("https://www.soundjay.com/misc/sounds/drum-roll-1.mp3", "drumroll.mp3")
 
+# -------------------------
+# DATA
+# -------------------------
 classes = [f"Class {i}" for i in range(4, 16)]
 values = [100,150,120,180,200,170,220,250,240,260,230,300]
-
 duration = 6
 
 # -------------------------
-# FIXED FRAME RENDERING
+# ANIMATED BAR CHART
 # -------------------------
 def make_frame(t):
     progress = min(t / duration, 1)
@@ -46,7 +65,7 @@ def make_frame(t):
 
     fig.canvas.draw()
 
-    # FIX: modern matplotlib safe conversion
+    # FIXED MATPLOTLIB (modern)
     image = np.asarray(fig.canvas.buffer_rgba())
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
 
@@ -55,12 +74,16 @@ def make_frame(t):
 
 chart = VideoClip(make_frame, duration=duration)
 
-# Money images
-five = ImageClip("five.png").set_duration(duration).resize(height=120).set_position((40,150))
-ten = ImageClip("ten.png").set_duration(duration).resize(height=120).set_position((60,260))
-twenty = ImageClip("twenty.png").set_duration(duration).resize(height=120).set_position((50,370))
+# -------------------------
+# LEFT MONEY (FROM /powerpoint)
+# -------------------------
+five = ImageClip(path("five.png")).set_duration(duration).resize(height=120).set_position((40,150))
+ten = ImageClip(path("ten.png")).set_duration(duration).resize(height=120).set_position((60,260))
+twenty = ImageClip(path("twenty.png")).set_duration(duration).resize(height=120).set_position((50,370))
 
-# Prize panel
+# -------------------------
+# PRIZE PANEL
+# -------------------------
 def make_panel():
     fig, ax = plt.subplots(figsize=(4,6))
     fig.patch.set_facecolor('#0b3d91')
@@ -72,18 +95,24 @@ def make_panel():
     ax.text(0.1,0.4,"🥉 3rd: Soft Play",color='#cd7f32',fontsize=16,transform=ax.transAxes)
 
     fig.canvas.draw()
+
     image = np.asarray(fig.canvas.buffer_rgba())
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+
     plt.close(fig)
     return image
 
 panel = ImageClip(make_panel()).set_duration(duration).set_position(("right","center"))
 
-# Logos
-ninja = ImageClip("ninja.png").set_duration(duration).resize(height=60).set_position((800,120))
-tenpin = ImageClip("tenpin.png").set_duration(duration).resize(height=60).set_position((800,220))
+# -------------------------
+# LOGOS (FROM /powerpoint)
+# -------------------------
+ninja = ImageClip(path("ninja.png")).set_duration(duration).resize(height=60).set_position((800,120))
+tenpin = ImageClip(path("tenpin.png")).set_duration(duration).resize(height=60).set_position((800,220))
 
-# Combine
+# -------------------------
+# COMBINE VIDEO
+# -------------------------
 video = CompositeVideoClip([
     chart,
     five, ten, twenty,
@@ -91,9 +120,14 @@ video = CompositeVideoClip([
     ninja, tenpin
 ])
 
-# Audio
-audio = AudioFileClip("drumroll.mp3").subclip(0, duration)
+# -------------------------
+# AUDIO
+# -------------------------
+audio = AudioFileClip(path("drumroll.mp3")).subclip(0, duration)
 video = video.set_audio(audio)
 
-# Export
-video.write_videofile("final_slide.mp4", fps=24)
+# -------------------------
+# EXPORT (IN POWERPOINT FOLDER)
+# -------------------------
+output = path("final_slide.mp4")
+video.write_videofile(output, fps=24)
