@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import requests
 
 from moviepy.editor import VideoClip, AudioFileClip, ImageClip, CompositeVideoClip
 
@@ -15,29 +14,14 @@ def path(file):
     return os.path.join(BASE_DIR, file)
 
 # -------------------------
-# DOWNLOAD ONLY DRUMROLL
-# -------------------------
-def download(url, filename):
-    filepath = path(filename)
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-    r.raise_for_status()
-    with open(filepath, "wb") as f:
-        f.write(r.content)
-    return filepath
-
-drumroll_file = download(
-    "https://cdn.pixabay.com/download/audio/2022/03/15/audio_7c2f8c2a7e.mp3?filename=drum-roll-1-16689.mp3",
-    "drumroll.mp3"
-)
-
-# -------------------------
-# LOCAL ASSETS (YOU PROVIDE THESE)
+# ALL LOCAL FILES
 # -------------------------
 ninja_file = path("ninja.png")
 tenpin_file = path("tenpin.png")
 five_file = path("five.png")
 ten_file = path("ten.png")
 twenty_file = path("twenty.png")
+drumroll_file = path("drumroll.mp3")
 
 # -------------------------
 # DATA
@@ -70,7 +54,7 @@ def make_frame(t):
     plt.tight_layout()
     fig.canvas.draw()
 
-    frame = np.asarray(fig.canvas.buffer_rgba())  # FIXED (no tostring_rgb)
+    frame = np.asarray(fig.canvas.buffer_rgba())
     plt.close(fig)
 
     return frame
@@ -78,7 +62,7 @@ def make_frame(t):
 chart = VideoClip(make_frame, duration=duration)
 
 # -------------------------
-# IMAGE CLIPS (FIXED RESIZE)
+# IMAGE CLIPS (LOCAL)
 # -------------------------
 five = ImageClip(five_file).set_duration(duration).resize(height=120).set_position((40,150))
 ten = ImageClip(ten_file).set_duration(duration).resize(height=120).set_position((60,260))
@@ -118,7 +102,7 @@ video = CompositeVideoClip([
 ])
 
 # -------------------------
-# AUDIO
+# LOCAL AUDIO (DRUMROLL)
 # -------------------------
 audio = AudioFileClip(drumroll_file).subclip(0, duration)
 video = video.set_audio(audio)
