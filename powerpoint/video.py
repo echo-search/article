@@ -8,7 +8,7 @@ def download(url, filename):
     with open(filename, "wb") as f:
         f.write(r.content)
 
-# Download assets
+# Assets
 download("https://www.kindpng.com/picc/m/83-832850_american-ninja-warrior-logo-png-american-ninja-warrior.png", "ninja.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Bowling_pins_icon.svg/512px-Bowling_pins_icon.svg.png", "tenpin.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Bank_of_England_%C2%A35_note.jpg/512px-Bank_of_England_%C2%A35_note.jpg", "five.png")
@@ -21,6 +21,9 @@ values = [100,150,120,180,200,170,220,250,240,260,230,300]
 
 duration = 6
 
+# -------------------------
+# FIXED FRAME RENDERING
+# -------------------------
 def make_frame(t):
     progress = min(t / duration, 1)
     current_values = [v * progress for v in values]
@@ -42,17 +45,19 @@ def make_frame(t):
     plt.tight_layout()
 
     fig.canvas.draw()
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    plt.close(fig)
 
+    # FIX: modern matplotlib safe conversion
+    image = np.asarray(fig.canvas.buffer_rgba())
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+
+    plt.close(fig)
     return image
 
 chart = VideoClip(make_frame, duration=duration)
 
-# Money
+# Money images
 five = ImageClip("five.png").set_duration(duration).resize(height=120).set_position((40,150))
-ten  = ImageClip("ten.png").set_duration(duration).resize(height=120).set_position((60,260))
+ten = ImageClip("ten.png").set_duration(duration).resize(height=120).set_position((60,260))
 twenty = ImageClip("twenty.png").set_duration(duration).resize(height=120).set_position((50,370))
 
 # Prize panel
@@ -67,8 +72,8 @@ def make_panel():
     ax.text(0.1,0.4,"🥉 3rd: Soft Play",color='#cd7f32',fontsize=16,transform=ax.transAxes)
 
     fig.canvas.draw()
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    image = np.asarray(fig.canvas.buffer_rgba())
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
     plt.close(fig)
     return image
 
@@ -78,6 +83,7 @@ panel = ImageClip(make_panel()).set_duration(duration).set_position(("right","ce
 ninja = ImageClip("ninja.png").set_duration(duration).resize(height=60).set_position((800,120))
 tenpin = ImageClip("tenpin.png").set_duration(duration).resize(height=60).set_position((800,220))
 
+# Combine
 video = CompositeVideoClip([
     chart,
     five, ten, twenty,
@@ -85,7 +91,9 @@ video = CompositeVideoClip([
     ninja, tenpin
 ])
 
+# Audio
 audio = AudioFileClip("drumroll.mp3").subclip(0, duration)
 video = video.set_audio(audio)
 
+# Export
 video.write_videofile("final_slide.mp4", fps=24)
