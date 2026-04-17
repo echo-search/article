@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 import requests
 from moviepy.editor import VideoClip, AudioFileClip, ImageClip, CompositeVideoClip
 
-# -------------------------
-# FORCE OUTPUT FOLDER
-# -------------------------
 BASE_DIR = "powerpoint"
 os.makedirs(BASE_DIR, exist_ok=True)
 
@@ -14,23 +11,25 @@ def path(file):
     return os.path.join(BASE_DIR, file)
 
 # -------------------------
-# SAFE DOWNLOAD FUNCTION
+# SAFE DOWNLOAD
 # -------------------------
 def download(url, filename):
     filepath = path(filename)
-    r = requests.get(url)
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
     with open(filepath, "wb") as f:
         f.write(r.content)
 
 # -------------------------
-# DOWNLOAD ASSETS INTO /powerpoint
+# ASSETS (FIXED LINKS)
 # -------------------------
-download("https://www.kindpng.com/picc/m/83-832850_american-ninja-warrior-logo-png-american-ninja-warrior.png", "ninja.png")
+download("https://upload.wikimedia.org/wikipedia/commons/3/3c/Ninja_Warrior_UK.png", "ninja.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Bowling_pins_icon.svg/512px-Bowling_pins_icon.svg.png", "tenpin.png")
+
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Bank_of_England_%C2%A35_note.jpg/512px-Bank_of_England_%C2%A35_note.jpg", "five.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Bank_of_England_%C2%A310_note.jpg/512px-Bank_of_England_%C2%A310_note.jpg", "ten.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Bank_of_England_%C2%A320_note.jpg/512px-Bank_of_England_%C2%A320_note.jpg", "twenty.png")
+
 download("https://www.soundjay.com/misc/sounds/drum-roll-1.mp3", "drumroll.mp3")
 
 # -------------------------
@@ -41,7 +40,7 @@ values = [100,150,120,180,200,170,220,250,240,260,230,300]
 duration = 6
 
 # -------------------------
-# ANIMATED BAR CHART
+# ANIMATION
 # -------------------------
 def make_frame(t):
     progress = min(t / duration, 1)
@@ -62,27 +61,26 @@ def make_frame(t):
         ax.text(v+2, i, f"£{int(v)}", color='white', va='center')
 
     plt.tight_layout()
-
     fig.canvas.draw()
 
-    # FIXED MATPLOTLIB (modern)
+    # FIXED MATPLOTLIB (NO tostring_rgb)
     image = np.asarray(fig.canvas.buffer_rgba())
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-
     plt.close(fig)
+
     return image
 
 chart = VideoClip(make_frame, duration=duration)
 
 # -------------------------
-# LEFT MONEY (FROM /powerpoint)
+# LEFT MONEY
 # -------------------------
 five = ImageClip(path("five.png")).set_duration(duration).resize(height=120).set_position((40,150))
 ten = ImageClip(path("ten.png")).set_duration(duration).resize(height=120).set_position((60,260))
 twenty = ImageClip(path("twenty.png")).set_duration(duration).resize(height=120).set_position((50,370))
 
 # -------------------------
-# PRIZE PANEL
+# RIGHT PANEL
 # -------------------------
 def make_panel():
     fig, ax = plt.subplots(figsize=(4,6))
@@ -95,23 +93,21 @@ def make_panel():
     ax.text(0.1,0.4,"🥉 3rd: Soft Play",color='#cd7f32',fontsize=16,transform=ax.transAxes)
 
     fig.canvas.draw()
-
     image = np.asarray(fig.canvas.buffer_rgba())
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-
     plt.close(fig)
     return image
 
 panel = ImageClip(make_panel()).set_duration(duration).set_position(("right","center"))
 
 # -------------------------
-# LOGOS (FROM /powerpoint)
+# LOGOS
 # -------------------------
 ninja = ImageClip(path("ninja.png")).set_duration(duration).resize(height=60).set_position((800,120))
 tenpin = ImageClip(path("tenpin.png")).set_duration(duration).resize(height=60).set_position((800,220))
 
 # -------------------------
-# COMBINE VIDEO
+# COMBINE
 # -------------------------
 video = CompositeVideoClip([
     chart,
@@ -120,14 +116,7 @@ video = CompositeVideoClip([
     ninja, tenpin
 ])
 
-# -------------------------
-# AUDIO
-# -------------------------
 audio = AudioFileClip(path("drumroll.mp3")).subclip(0, duration)
 video = video.set_audio(audio)
 
-# -------------------------
-# EXPORT (IN POWERPOINT FOLDER)
-# -------------------------
-output = path("final_slide.mp4")
-video.write_videofile(output, fps=24)
+video.write_videofile(path("final_slide.mp4"), fps=24)
