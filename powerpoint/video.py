@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import requests
 from moviepy.editor import VideoClip, AudioFileClip, ImageClip, CompositeVideoClip
 
+# -------------------------
+# SETUP PATH
+# -------------------------
 BASE_DIR = "powerpoint"
 os.makedirs(BASE_DIR, exist_ok=True)
 
@@ -15,22 +18,33 @@ def path(file):
 # -------------------------
 def download(url, filename):
     filepath = path(filename)
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    r.raise_for_status()
-    with open(filepath, "wb") as f:
-        f.write(r.content)
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        r.raise_for_status()
+        with open(filepath, "wb") as f:
+            f.write(r.content)
+        return True
+    except Exception as e:
+        print(f"Failed download: {filename}")
+        return False
 
 # -------------------------
-# ASSETS (FIXED LINKS)
+# ASSETS (WEB)
 # -------------------------
-download("https://upload.wikimedia.org/wikipedia/commons/3/3c/Ninja_Warrior_UK.png", "ninja.png")
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Bowling_pins_icon.svg/512px-Bowling_pins_icon.svg.png", "tenpin.png")
 
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Bank_of_England_%C2%A35_note.jpg/512px-Bank_of_England_%C2%A35_note.jpg", "five.png")
+
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Bank_of_England_%C2%A310_note.jpg/512px-Bank_of_England_%C2%A310_note.jpg", "ten.png")
+
 download("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Bank_of_England_%C2%A320_note.jpg/512px-Bank_of_England_%C2%A320_note.jpg", "twenty.png")
 
-download("https://www.soundjay.com/misc/sounds/drum-roll-1.mp3", "drumroll.mp3")
+drum_ok = download("https://www.soundjay.com/misc/sounds/drum-roll-1.mp3", "drumroll.mp3")
+
+# -------------------------
+# LOCAL FILE (ONLY ONE)
+# -------------------------
+ninja_path = path("ninja.png")
 
 # -------------------------
 # DATA
@@ -40,7 +54,7 @@ values = [100,150,120,180,200,170,220,250,240,260,230,300]
 duration = 6
 
 # -------------------------
-# ANIMATION
+# CHART
 # -------------------------
 def make_frame(t):
     progress = min(t / duration, 1)
@@ -63,12 +77,10 @@ def make_frame(t):
     plt.tight_layout()
     fig.canvas.draw()
 
-    # FIXED MATPLOTLIB (NO tostring_rgb)
-    image = np.asarray(fig.canvas.buffer_rgba())
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+    img = np.asarray(fig.canvas.buffer_rgba())
     plt.close(fig)
 
-    return image
+    return img
 
 chart = VideoClip(make_frame, duration=duration)
 
@@ -93,21 +105,20 @@ def make_panel():
     ax.text(0.1,0.4,"🥉 3rd: Soft Play",color='#cd7f32',fontsize=16,transform=ax.transAxes)
 
     fig.canvas.draw()
-    image = np.asarray(fig.canvas.buffer_rgba())
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+    img = np.asarray(fig.canvas.buffer_rgba())
     plt.close(fig)
-    return image
+    return img
 
 panel = ImageClip(make_panel()).set_duration(duration).set_position(("right","center"))
 
 # -------------------------
 # LOGOS
 # -------------------------
-ninja = ImageClip(path("ninja.png")).set_duration(duration).resize(height=60).set_position((800,120))
+ninja = ImageClip(ninja_path).set_duration(duration).resize(height=60).set_position((800,120))
 tenpin = ImageClip(path("tenpin.png")).set_duration(duration).resize(height=60).set_position((800,220))
 
 # -------------------------
-# COMBINE
+# COMPOSITE
 # -------------------------
 video = CompositeVideoClip([
     chart,
@@ -116,7 +127,9 @@ video = CompositeVideoClip([
     ninja, tenpin
 ])
 
-audio = AudioFileClip(path("drumroll.mp3")).subclip(0, duration)
-video = video.set_audio(audio)
-
-video.write_videofile(path("final_slide.mp4"), fps=24)
+# -------------------------
+# AUDIO (SAFE)
+# -------------------------
+if drum_ok and os.path.exists(path("drumroll.mp3")):
+    audio = AudioFileClip(path("drumroll.mp3")).subclip(0, duration)
+    video = video.set_audio(audio)
