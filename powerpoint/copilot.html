@@ -162,9 +162,12 @@
   <!-- LOGIN PANEL -->
   <div id="loginPanel" class="panel">
     <h1>Praise Assembly Login</h1>
+    <p style="font-size:13px; text-align:center; margin-bottom:10px;">
+      First time: use username <strong>teacher</strong> and any password you like. That password’s SHA-256 hash is stored and required next time.
+    </p>
     <div>
       <label for="username">Username</label>
-      <input id="username" type="text" autocomplete="username" />
+      <input id="username" type="text" autocomplete="username" value="teacher" />
     </div>
     <div style="margin-top:8px;">
       <label for="password">Password</label>
@@ -174,7 +177,7 @@
       <button id="loginBtn">Login</button>
     </div>
     <div id="loginError" class="error"></div>
-    <div class="hint">Password is securely checked using SHA-256 (no plaintext stored).</div>
+    <div class="hint">Password is stored only as a SHA-256 hash in localStorage (no plaintext kept).</div>
   </div>
 
   <!-- MAIN APP (HIDDEN UNTIL LOGIN) -->
@@ -214,15 +217,11 @@
 
 <script>
   // =========================
-  // LOGIN SYSTEM (SHA-256)
+  // LOGIN SYSTEM (SHA-256, FIRST-RUN SETUP)
   // =========================
 
-  // Example credentials:
-  // username: teacher
-  // password: praise123
-  // Precomputed SHA-256 hash (hex) of "praise123"
-  const STORED_USERNAME = "teacher";
-  const STORED_PASSWORD_HASH = "f7c3e5f3f94a639a6a39aea66e68132c0aaf645ed90e2998878e9ef32ed500e4";
+  const LOGIN_USERNAME = "teacher";
+  const STORAGE_KEY_HASH = "praise_assembly_password_hash";
 
   const loginPanel = document.getElementById("loginPanel");
   const mainApp = document.getElementById("mainApp");
@@ -247,13 +246,25 @@
       return;
     }
 
+    if (user !== LOGIN_USERNAME) {
+      loginError.textContent = "Username must be 'teacher'.";
+      return;
+    }
+
     try {
-      const hash = await sha256Hex(pass);
-      if (user === STORED_USERNAME && hash === STORED_PASSWORD_HASH) {
+      const enteredHash = await sha256Hex(pass);
+      const storedHash = localStorage.getItem(STORAGE_KEY_HASH);
+
+      if (!storedHash) {
+        // First-time setup: store hash and log in
+        localStorage.setItem(STORAGE_KEY_HASH, enteredHash);
+        loginPanel.style.display = "none";
+        mainApp.style.display = "flex";
+      } else if (storedHash === enteredHash) {
         loginPanel.style.display = "none";
         mainApp.style.display = "flex";
       } else {
-        loginError.textContent = "Invalid username or password.";
+        loginError.textContent = "Invalid password.";
       }
     } catch (e) {
       console.error(e);
@@ -396,9 +407,6 @@
   Chart.register(starLabelPlugin);
 
   function createOrUpdateChart(values, animate = true) {
-    const chartWidth = canvas.width - chartAreaPadding.left - chartAreaPadding.right;
-    const chartHeight = canvas.height - chartAreaPadding.top - chartAreaPadding.bottom;
-
     if (chart) {
       chart.data.datasets[0].data = values;
       chart.options.animation.duration = animate ? 5000 : 0;
