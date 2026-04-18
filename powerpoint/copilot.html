@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Praise Assembly Video Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #fff;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      padding: 10px;
+      box-sizing: border-box;
+      gap: 10px;
+    }
+
+    .panel {
+      background: #111827;
+      border-radius: 12px;
+      padding: 16px;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 900px;
+      color: #e5e7eb;
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 12px 0;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 8px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      touch-action: manipulation;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+
+    .error {
+      color: #f97316;
+      margin-top: 8px;
+      text-align: center;
+      font-size: 14px;
+      min-height: 18px;
+    }
+
+    /* Video canvas wrapper: keeps 9:16 aspect and scales for screen */
+    #videoWrapperOuter {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #videoWrapperInner {
+      position: relative;
+      width: 100%;
+      max-height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #videoCanvas {
+      background: #0b3d91;
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+      aspect-ratio: 9 / 16;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+      touch-action: none;
+    }
+
+    .hint {
+      font-size: 12px;
+      text-align: center;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    @media (orientation: landscape) {
+      #app {
+        flex-direction: row;
+        align-items: stretch;
+        justify-content: center;
+      }
+      #sideControls {
+        max-width: 360px;
+        width: 40%;
+      }
+      #videoWrapperOuter {
+        width: 60%;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- LOGIN PANEL -->
+  <div id="loginPanel" class="panel">
+    <h1>Praise Assembly Login</h1>
+    <div>
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" />
+    </div>
+    <div style="margin-top:8px;">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+    </div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button id="loginBtn">Login</button>
+    </div>
+    <div id="loginError" class="error"></div>
+    <div class="hint">Password is securely checked using SHA-256 (no plaintext stored).</div>
+  </div>
+
+  <!-- MAIN APP (HIDDEN UNTIL LOGIN) -->
+  <div id="mainApp" style="display:none; width:100%; height:100%; flex:1; flex-direction:column;">
+    <div id="sideControls" class="panel" style="margin-bottom:8px;">
+      <h2>Praise Assembly Editor</h2>
+      <p style="font-size:13px; text-align:center; margin-bottom:10px;">
+        Enter values for each class (0–63). Then animate and export a 1080x1920 vertical video.
+      </p>
+      <div class="grid" id="classInputs"></div>
+      <div class="btn-row">
+        <button id="updateAnimateBtn">Update &amp; Animate</button>
+        <button id="exportBtn">Export 1080p Vertical Video</button>
+      </div>
+      <div id="status" class="error"></div>
+      <div class="hint">
+        Exported video is 1080x1920 (9:16), with chart, money, prizes, and drumroll audio.
+      </div>
+    </div>
+
+    <div id="videoWrapperOuter">
+      <div id="videoWrapperInner">
+        <!-- This canvas is the ONLY thing recorded into the video -->
+        <canvas id="videoCanvas" width="1080" height="1920"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Drumroll audio (will be mixed into recording) -->
+<audio id="drumAudio" preload="auto">
+  <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_4b1f8f5c3e.mp3?filename=drum-roll-1-110397.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+  // =========================
+  // LOGIN SYSTEM (SHA-256)
+  // =========================
+
+  // Example credentials:
+  // username: teacher
+  // password: praise123
+  // Precomputed SHA-256 hash (hex) of "praise123"
+  const STORED_USERNAME = "teacher";
+  const STORED_PASSWORD_HASH = "f7c3e5f3f94a639a6a39aea66e68132c0aaf645ed90e2998878e9ef32ed500e4";
+
+  const loginPanel = document.getElementById("loginPanel");
+  const mainApp = document.getElementById("mainApp");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginError = document.getElementById("loginError");
+
+  async function sha256Hex(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  loginBtn.addEventListener("click", async () => {
+    loginError.textContent = "";
+    const user = document.getElementById("username").value.trim();
+    const pass = document.getElementById("password").value;
+
+    if (!user || !pass) {
+      loginError.textContent = "Please enter both username and password.";
+      return;
+    }
+
+    try {
+      const hash = await sha256Hex(pass);
+      if (user === STORED_USERNAME && hash === STORED_PASSWORD_HASH) {
+        loginPanel.style.display = "none";
+        mainApp.style.display = "flex";
+      } else {
+        loginError.textContent = "Invalid username or password.";
+      }
+    } catch (e) {
+      console.error(e);
+      loginError.textContent = "Error during login. Please try again.";
+    }
+  });
+
+  // =========================
+  // CLASS INPUTS
+  // =========================
+  const classInputsContainer = document.getElementById("classInputs");
+  const classLabels = [];
+  for (let i = 4; i <= 15; i++) {
+    classLabels.push("Class " + i);
+  }
+
+  const defaultValues = [12, 25, 40, 63, 51, 37, 29, 18, 9, 55, 44, 30];
+
+  classLabels.forEach((label, idx) => {
+    const wrapper = document.createElement("div");
+    const lab = document.createElement("label");
+    lab.textContent = label;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = "63";
+    input.value = defaultValues[idx] ?? 0;
+    input.id = "input_" + label.replace(" ", "_");
+    wrapper.appendChild(lab);
+    wrapper.appendChild(input);
+    classInputsContainer.appendChild(wrapper);
+  });
+
+  function getClassValues() {
+    return classLabels.map(label => {
+      const el = document.getElementById("input_" + label.replace(" ", "_"));
+      let v = parseInt(el.value, 10);
+      if (isNaN(v) || v < 0) v = 0;
+      if (v > 63) v = 63;
+      el.value = v;
+      return v;
+    });
+  }
+
+  // =========================
+  // CANVAS & CHART SETUP
+  // =========================
+  const canvas = document.getElementById("videoCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const chartAreaPadding = {
+    left: 260,   // space for money images
+    right: 260,  // space for prize list
+    top: 220,    // space for title
+    bottom: 160  // space for margins
+  };
+
+  let chart; // Chart.js instance
+
+  // Custom plugin to draw star badges with values and ranking colors
+  const starLabelPlugin = {
+    id: "starLabelPlugin",
+    afterDatasetsDraw(chartInstance, args, pluginOptions) {
+      const { ctx } = chartInstance;
+      const meta = chartInstance.getDatasetMeta(0);
+      const data = chartInstance.data.datasets[0].data;
+      if (!meta || !data) return;
+
+      // Determine ranking (1st, 2nd, 3rd, others)
+      const sorted = data
+        .map((v, i) => ({ v, i }))
+        .sort((a, b) => b.v - a.v);
+
+      const rankByIndex = {};
+      sorted.forEach((item, idx) => {
+        rankByIndex[item.i] = idx + 1;
+      });
+
+      function getColorForRank(rank) {
+        if (rank === 1) return "#FFD700"; // Gold
+        if (rank === 2) return "#C0C0C0"; // Silver
+        if (rank === 3) return "#CD7F32"; // Bronze
+        return "#FFEB3B"; // Yellow
+      }
+
+      ctx.save();
+      ctx.font = "bold 26px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      meta.data.forEach((bar, index) => {
+        const pos = bar.tooltipPosition();
+        const value = data[index];
+        const rank = rankByIndex[index];
+        const color = getColorForRank(rank);
+
+        const starRadius = 32;
+        const x = pos.x + 60; // shift to the right of bar
+        const y = pos.y;
+
+        // Draw star
+        ctx.beginPath();
+        const spikes = 5;
+        const outerRadius = starRadius;
+        const innerRadius = starRadius * 0.5;
+        let rot = Math.PI / 2 * 3;
+        let cx = x;
+        let cy = y;
+        let step = Math.PI / spikes;
+
+        ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+          let x1 = cx + Math.cos(rot) * outerRadius;
+          let y1 = cy + Math.sin(rot) * outerRadius;
+          ctx.lineTo(x1, y1);
+          rot += step;
+
+          x1 = cx + Math.cos(rot) * innerRadius;
+          y1 = cy + Math.sin(rot) * innerRadius;
+          ctx.lineTo(x1, y1);
+          rot += step;
+        }
+        ctx.lineTo(cx, cy - outerRadius);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "#0b3d91";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Value text
+        ctx.fillStyle = "#000";
+        ctx.fillText(String(value), x, y);
+      });
+
+      ctx.restore();
+    }
+  };
+
+  Chart.register(starLabelPlugin);
+
+  function createOrUpdateChart(values, animate = true) {
+    const chartWidth = canvas.width - chartAreaPadding.left - chartAreaPadding.right;
+    const chartHeight = canvas.height - chartAreaPadding.top - chartAreaPadding.bottom;
+
+    if (chart) {
+      chart.data.datasets[0].data = values;
+      chart.options.animation.duration = animate ? 5000 : 0;
+      chart.update();
+      return;
+    }
+
+    chart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: classLabels,
+        datasets: [{
+          label: "Points",
+          data: values,
+          backgroundColor: "#4FC3F7"
+        }]
+      },
+      options: {
+        responsive: false,
+        animation: {
+          duration: animate ? 5000 : 0
+        },
+        indexAxis: "y",
+        layout: {
+          padding: {
+            left: chartAreaPadding.left,
+            right: chartAreaPadding.right,
+            top: chartAreaPadding.top,
+            bottom: chartAreaPadding.bottom
+          }
+        },
+        scales: {
+          x: {
+            min: 0,
+            max: 80,
+            grid: {
+              color: "rgba(255,255,255,0.15)"
+            },
+            ticks: {
+              color: "#111827",
+              font: {
+                size: 18
+              }
+            }
+          },
+          y: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: "#111827",
+              font: {
+                size: 18
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: false
+          }
+        }
+      },
+      plugins: [starLabelPlugin]
+    });
+  }
+
+  // =========================
+  // STATIC DRAWING (BACKGROUND, MONEY, PRIZES, TITLE)
+  // =========================
+  function drawStaticLayout() {
+    // Full background
+    ctx.fillStyle = "#0b3d91";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 64px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Praise Assembly", canvas.width / 2, 60);
+
+    // White chart panel
+    const panelX = chartAreaPadding.left - 40;
+    const panelY = chartAreaPadding.top - 40;
+    const panelW = canvas.width - chartAreaPadding.left - chartAreaPadding.right + 80;
+    const panelH = canvas.height - chartAreaPadding.top - chartAreaPadding.bottom + 80;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.roundRect(panelX, panelY, panelW, panelH, 32);
+    ctx.fill();
+
+    // LEFT: Money "images" (stylised cards)
+    const moneyX = 60;
+    const moneyTop = 360;
+    const moneyW = 140;
+    const moneyH = 90;
+    const moneyGap = 40;
+    const moneyValues = ["£5", "£10", "£20"];
+    const moneyColors = ["#22c55e", "#0ea5e9", "#f97316"];
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 40px system-ui";
+
+    moneyValues.forEach((val, idx) => {
+      const y = moneyTop + idx * (moneyH + moneyGap);
+      ctx.fillStyle = "#0f172a";
+      ctx.roundRect(moneyX, y, moneyW, moneyH, 18);
+      ctx.fill();
+
+      ctx.strokeStyle = moneyColors[idx];
+      ctx.lineWidth = 4;
+      ctx.roundRect(moneyX, y, moneyW, moneyH, 18);
+      ctx.stroke();
+
+      ctx.fillStyle = moneyColors[idx];
+      ctx.fillText(val, moneyX + moneyW / 2, y + moneyH / 2);
+    });
+
+    // RIGHT: Prize list with simple "logos"
+    const prizeX = canvas.width - 260 + 40;
+    let prizeY = 420;
+    const lineGap = 120;
+
+    const prizes = [
+      { icon: "🥇", text: "1st Prize: Ninja Warriors", color: "#FFD700" },
+      { icon: "🥈", text: "2nd Prize: Tenpin", color: "#C0C0C0" },
+      { icon: "🥉", text: "3rd Prize: Soft Play", color: "#CD7F32" }
+    ];
+
+    prizes.forEach(prize => {
+      // Logo circle
+      const logoRadius = 32;
+      const logoX = prizeX;
+      const logoY = prizeY;
+
+      ctx.beginPath();
+      ctx.arc(logoX, logoY, logoRadius, 0, Math.PI * 2);
+      ctx.fillStyle = prize.color;
+      ctx.fill();
+
+      ctx.font = "32px system-ui";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(prize.icon, logoX, logoY);
+
+      // Text
+      ctx.textAlign = "left";
+      ctx.font = "bold 26px system-ui";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(prize.text, logoX + logoRadius + 16, logoY);
+
+      prizeY += lineGap;
+    });
+  }
+
+  // Extend CanvasRenderingContext2D with roundRect if missing
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      if (w < 2 * r) r = w / 2;
+      if (h < 2 * r) r = h / 2;
+      this.beginPath();
+      this.moveTo(x + r, y);
+      this.arcTo(x + w, y, x + w, y + h, r);
+      this.arcTo(x + w, y + h, x, y + h, r);
+      this.arcTo(x, y + h, x, y, r);
+      this.arcTo(x, y, x + w, y, r);
+      this.closePath();
+      return this;
+    };
+  }
+
+  // Initial draw
+  drawStaticLayout();
+  createOrUpdateChart(getClassValues(), false);
+
+  // =========================
+  // ANIMATION & AUDIO
+  // =========================
+  const updateAnimateBtn = document.getElementById("updateAnimateBtn");
+  const exportBtn = document.getElementById("exportBtn");
+  const statusEl = document.getElementById("status");
+  const drumAudio = document.getElementById("drumAudio");
+
+  let isAnimating = false;
+
+  function startChartAnimation() {
+    const values = getClassValues();
+    statusEl.textContent = "";
+    isAnimating = true;
+
+    // Reset static layout and chart
+    drawStaticLayout();
+    createOrUpdateChart(values, true);
+
+    // Restart drumroll
+    drumAudio.currentTime = 0;
+    drumAudio.play().catch(() => {
+      // On iOS, must be triggered by user gesture; this is called from button click
+    });
+
+    // Stop animation flag after 5.5s
+    setTimeout(() => {
+      isAnimating = false;
+    }, 5500);
+  }
+
+  updateAnimateBtn.addEventListener("click", () => {
+    startChartAnimation();
+  });
+
+  // =========================
+  // EXPORT VIDEO (1080x1920, .webm)
+  // =========================
+  async function exportVideo() {
+    statusEl.textContent = "Preparing export...";
+    exportBtn.disabled = true;
+    updateAnimateBtn.disabled = true;
+
+    const values = getClassValues();
+
+    // Redraw static layout and chart with animation
+    drawStaticLayout();
+    createOrUpdateChart(values, true);
+
+    // Prepare streams
+    const fps = 30;
+    const canvasStream = canvas.captureStream(fps);
+    let audioStream;
+
+    try {
+      // Restart drumroll
+      drumAudio.currentTime = 0;
+      await drumAudio.play();
+      audioStream = drumAudio.captureStream();
+    } catch (e) {
+      console.warn("Audio capture may not be supported or playback blocked:", e);
+    }
+
+    let combinedStream;
+    if (audioStream) {
+      combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioStream.getAudioTracks()
+      ]);
+    } else {
+      combinedStream = canvasStream;
+    }
+
+    const recordedChunks = [];
+    const options = { mimeType: "video/webm;codecs=vp9,opus" };
+    let mediaRecorder;
+
+    try {
+      mediaRecorder = new MediaRecorder(combinedStream, options);
+    } catch (e) {
+      console.error("MediaRecorder error:", e);
+      statusEl.textContent = "MediaRecorder not supported in this browser.";
+      exportBtn.disabled = false;
+      updateAnimateBtn.disabled = false;
+      return;
+    }
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = "praise-assembly-1080x1920.webm";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+
+      statusEl.textContent = "Export complete. Video downloaded.";
+      exportBtn.disabled = false;
+      updateAnimateBtn.disabled = false;
+    };
+
+    mediaRecorder.start();
+
+    // Record for ~6 seconds (slightly longer than animation)
+    const recordDuration = 6000;
+    statusEl.textContent = "Recording video (about 6 seconds)...";
+
+    setTimeout(() => {
+      mediaRecorder.stop();
+      drumAudio.pause();
+      drumAudio.currentTime = 0;
+    }, recordDuration);
+  }
+
+  exportBtn.addEventListener("click", () => {
+    exportVideo();
+  });
+
+  // =========================
+  // TOUCH-FRIENDLY TWEAKS
+  // =========================
+  // Prevent double-tap zoom on iPad
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", function (event) {
+    const now = new Date().getTime();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, false);
+</script>
+</body>
+</html>
